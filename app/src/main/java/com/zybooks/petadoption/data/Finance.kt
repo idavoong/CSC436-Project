@@ -1,5 +1,7 @@
 package com.zybooks.petadoption.data
 
+import java.time.LocalDate
+import java.util.Calendar
 import java.util.Date
 
 enum class FinanceType {
@@ -11,5 +13,5 @@ data class Finance (
     val name: String = "",
     val category: FinanceType = FinanceType.EXPENSE,
     val amount: Double = 0.0,
-    val date: Date = Date()
+    val date: Calendar = Calendar.getInstance()
 )

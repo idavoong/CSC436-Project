@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -60,6 +61,7 @@ import com.zybooks.petadoption.ui.theme.FinanceTheme
 import kotlinx.serialization.Serializable
 import java.text.ParseException
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Locale
 
 
@@ -68,18 +70,13 @@ sealed class Routes {
     data object Home
 
     @Serializable
-    data class Edit(
-        val financeId: Int
-    )
-//
-//    @Serializable
-//    data object Input
+    data class Edit(val financeId: Int)
 }
 
 @Composable
 fun FinanceApp() {
     val navController = rememberNavController()
-    val homeViewModel: HomeViewModel = viewModel() // ✅ Initialize HomeViewModel
+    val homeViewModel: HomeViewModel = viewModel()
 
     NavHost(
         navController = navController,
@@ -90,22 +87,21 @@ fun FinanceApp() {
                 onEditClick = { finance ->
                     navController.navigate(Routes.Edit(finance.id))
                 },
-                viewModel = homeViewModel // ✅ Pass HomeViewModel
+                viewModel = homeViewModel
             )
         }
-        composable<Routes.Edit> { backstackEntry ->
-            val edit: Routes.Edit = backstackEntry.toRoute()
-
+        composable<Routes.Edit> { backStackEntry ->
+            val editRoute: Routes.Edit = backStackEntry.toRoute()
             EditScreen(
-                id = edit.financeId,
-                homeViewModel = homeViewModel, // ✅ Pass HomeViewModel
+                id = editRoute.financeId,
+                homeViewModel = homeViewModel,
                 onSubmit = { updatedFinance ->
-                    // Handle finance update logic
+                    // Additional logic can be added here if needed.
                 },
                 onDelete = { financeToDelete ->
-                    // Handle finance deletion logic
+                    homeViewModel.deleteFinance(financeToDelete)
                 },
-                navController = navController // ✅ Pass NavController
+                navController = navController
             )
         }
     }
@@ -117,7 +113,7 @@ fun FinanceAppBar(
     title: String,
     modifier: Modifier = Modifier,
     canNavigateBack: Boolean = false,
-    onUpClick: () -> Unit = { },
+    onUpClick: () -> Unit = { }
 ) {
     TopAppBar(
         title = { Text(title) },
@@ -128,7 +124,7 @@ fun FinanceAppBar(
         navigationIcon = {
             if (canNavigateBack) {
                 IconButton(onClick = onUpClick) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                    Icon(Icons.Filled.ArrowBack, "Back")
                 }
             }
         }
@@ -164,24 +160,26 @@ fun HomeScreen(
 @Composable
 fun ExpenseItem(
     expense: Finance,
-    onEditClick: (Finance) -> Unit,  // Keep only the edit action
+    onEditClick: (Finance) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Box(modifier = modifier.fillMaxWidth().padding(8.dp)) {
-        // Card itself
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(8.dp)
+    ) {
         Card(
             colors = CardDefaults.cardColors(containerColor = Color.LightGray),
-            modifier = Modifier.fillMaxWidth()  // Removed clickable modifier
+            modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                val formattedDate =
-                    SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(expense.date)
-
+                // Format the Calendar date using its time property.
+                val formattedDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                    .format(expense.date.time)
                 Text(
                     text = "Date: $formattedDate | ${expense.name}",
                     style = MaterialTheme.typography.bodyLarge
                 )
-
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
@@ -191,22 +189,21 @@ fun ExpenseItem(
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
-                        text = expense.category.name, // Convert enum to string
+                        text = expense.category.name,
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
             }
         }
-
-        // Edit Icon in the top-right corner
+        // Edit Icon at the top-right corner.
         IconButton(
             onClick = { onEditClick(expense) },
             modifier = Modifier
-                .align(Alignment.TopEnd) // Position it at the top-right corner
-                .padding(8.dp)  // Add some padding from the edges
+                .align(Alignment.TopEnd)
+                .padding(8.dp)
         ) {
             Icon(
-                imageVector = Icons.Default.Edit,  // Use the default Edit icon
+                imageVector = Icons.Default.Edit,
                 contentDescription = "Edit"
             )
         }
@@ -216,28 +213,43 @@ fun ExpenseItem(
 @Composable
 fun EditScreen(
     id: Int,
-    homeViewModel: HomeViewModel, // ✅ Pass HomeViewModel
+    homeViewModel: HomeViewModel,
     viewModel: EditViewModel = viewModel(),
     onSubmit: (Finance) -> Unit,
     onDelete: (Finance) -> Unit,
-    navController: NavController, // ✅ Add NavController to navigate back
+    navController: NavController,
     modifier: Modifier = Modifier
 ) {
     val finance by viewModel.finance.collectAsState()
 
     LaunchedEffect(id) {
-        viewModel.loadFinance(id) // Load finance when screen starts
+        viewModel.loadFinance(id)
     }
 
+    // Formatter for date using "yyyy-MM-dd" pattern.
     val dateFormatter = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
 
+    // Initialize state variables and update when finance changes.
     var name by remember { mutableStateOf(finance.name) }
-    var date by remember { mutableStateOf(finance.date.toString()) }
+    var dateString by remember { mutableStateOf(dateFormatter.format(finance.date.time)) }
     var category by remember { mutableStateOf(finance.category.name) }
     var amount by remember { mutableStateOf(finance.amount.toString()) }
 
+    LaunchedEffect(finance) {
+        name = finance.name
+        dateString = dateFormatter.format(finance.date.time)
+        category = finance.category.name
+        amount = finance.amount.toString()
+    }
+
     Scaffold(
-        topBar = { FinanceAppBar(title = "Edit Expense") }
+        topBar = {
+            FinanceAppBar(
+                title = "Edit Expense",
+                canNavigateBack = true,
+                onUpClick = { navController.popBackStack() }
+            )
+        }
     ) { innerPadding ->
         Column(
             modifier = modifier
@@ -252,16 +264,16 @@ fun EditScreen(
             )
             Spacer(modifier = Modifier.height(8.dp))
             TextField(
-                value = date,
-                onValueChange = { date = it },
-                label = { Text("Date") },
+                value = dateString,
+                onValueChange = { dateString = it },
+                label = { Text("Date (yyyy-MM-dd)") },
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(8.dp))
             TextField(
                 value = category,
                 onValueChange = { category = it },
-                label = { Text("Category") },
+                label = { Text("Category (INCOME or EXPENSE)") },
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(8.dp))
@@ -283,14 +295,25 @@ fun EditScreen(
                 Button(onClick = {
                     val updatedFinance = finance.copy(
                         name = name,
-                        date = try { dateFormatter.parse(date) ?: finance.date } catch (e: ParseException) { finance.date },
-                        category = try { enumValueOf<FinanceType>(category) } catch (e: IllegalArgumentException) { finance.category },
+                        date = try {
+                            // Parse the string into a Calendar instance.
+                            Calendar.getInstance().apply {
+                                time = dateFormatter.parse(dateString)
+                            }
+                        } catch (e: Exception) {
+                            finance.date
+                        },
+                        category = try {
+                            enumValueOf<FinanceType>(category.uppercase(Locale.getDefault()))
+                        } catch (e: IllegalArgumentException) {
+                            finance.category
+                        },
                         amount = amount.toDoubleOrNull() ?: finance.amount
                     )
 
-                    homeViewModel.updateFinance(updatedFinance)  // ✅ Update HomeViewModel
+                    homeViewModel.updateFinance(updatedFinance)
                     onSubmit(updatedFinance)
-                    navController.popBackStack() // ✅ Go back to home
+                    navController.popBackStack()
                 }) {
                     Text("Submit")
                 }
@@ -298,35 +321,3 @@ fun EditScreen(
         }
     }
 }
-
-@Preview
-@Composable
-fun PreviewHomeScreen() {
-    FinanceTheme {
-        HomeScreen(
-            onEditClick = {}
-        )
-    }
-}
-
-//@Preview
-//@Composable
-//fun PreviewEditScreen() {
-//    val finance = FinanceDataSource().getFinance(1) ?: Finance() // Get a sample finance object
-//    val dummyViewModel = EditViewModel() // Create a mock ViewModel
-//
-//    FinanceTheme {
-//        EditScreen(
-//            id = finance.id,
-//            viewModel = dummyViewModel,
-//            onSubmit = { updatedFinance ->
-//                // Mock submit action for preview
-//                println("Updated finance: $updatedFinance")
-//            },
-//            onDelete = { financeToDelete ->
-//                // Mock delete action for preview
-//                println("Deleted finance: $financeToDelete")
-//            },
-//        )
-//    }
-//}
