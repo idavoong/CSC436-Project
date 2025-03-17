@@ -19,6 +19,11 @@ class HomeViewModel : ViewModel() {
         _financeList.value = FinanceDataSource.loadFinances()
     }
 
+    fun addFinance(newFinance: Finance) {
+        FinanceDataSource.addFinance(newFinance)
+        refreshList()
+    }
+
     fun updateFinance(updatedFinance: Finance) {
         FinanceDataSource.updateFinance(updatedFinance)
         refreshList()

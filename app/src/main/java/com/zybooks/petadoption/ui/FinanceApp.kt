@@ -18,12 +18,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -71,6 +73,9 @@ sealed class Routes {
 
     @Serializable
     data class Edit(val financeId: Int)
+
+    @Serializable
+    data object Input
 }
 
 @Composable
@@ -84,9 +89,8 @@ fun FinanceApp() {
     ) {
         composable<Routes.Home> {
             HomeScreen(
-                onEditClick = { finance ->
-                    navController.navigate(Routes.Edit(finance.id))
-                },
+                onEditClick = { finance -> navController.navigate(Routes.Edit(finance.id)) },
+                onAddNewClick = { navController.navigate(Routes.Input) },
                 viewModel = homeViewModel
             )
         }
@@ -102,6 +106,13 @@ fun FinanceApp() {
                     homeViewModel.deleteFinance(financeToDelete)
                 },
                 navController = navController
+            )
+        }
+        composable<Routes.Input> {
+            InputScreen(
+                homeViewModel = homeViewModel,
+                navController = navController,
+                onSubmit = { /* optional */ }
             )
         }
     }
@@ -134,13 +145,19 @@ fun FinanceAppBar(
 @Composable
 fun HomeScreen(
     onEditClick: (Finance) -> Unit,
+    onAddNewClick: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = viewModel()
 ) {
     val financeList by viewModel.financeList.collectAsState()
 
     Scaffold(
-        topBar = { FinanceAppBar(title = "Recent Expenses") }
+        topBar = { FinanceAppBar(title = "Recent Expenses") },
+        floatingActionButton = {
+            FloatingActionButton(onClick = onAddNewClick) {
+                Icon(Icons.Default.Add, contentDescription = "Add new expense")
+            }
+        }
     ) { innerPadding ->
         LazyColumn(
             contentPadding = PaddingValues(8.dp),
@@ -156,6 +173,7 @@ fun HomeScreen(
         }
     }
 }
+
 
 @Composable
 fun ExpenseItem(
@@ -195,7 +213,6 @@ fun ExpenseItem(
                 }
             }
         }
-        // Edit Icon at the top-right corner.
         IconButton(
             onClick = { onEditClick(expense) },
             modifier = Modifier
@@ -226,10 +243,8 @@ fun EditScreen(
         viewModel.loadFinance(id)
     }
 
-    // Formatter for date using "yyyy-MM-dd" pattern.
     val dateFormatter = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
 
-    // Initialize state variables and update when finance changes.
     var name by remember { mutableStateOf(finance.name) }
     var dateString by remember { mutableStateOf(dateFormatter.format(finance.date.time)) }
     var category by remember { mutableStateOf(finance.category.name) }
@@ -289,14 +304,16 @@ fun EditScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Button(onClick = { onDelete(finance) }) {
+                Button(onClick = {
+                    onDelete(finance)
+                    navController.popBackStack()
+                }) {
                     Text("Delete")
                 }
                 Button(onClick = {
                     val updatedFinance = finance.copy(
                         name = name,
                         date = try {
-                            // Parse the string into a Calendar instance.
                             Calendar.getInstance().apply {
                                 time = dateFormatter.parse(dateString)
                             }
@@ -317,6 +334,91 @@ fun EditScreen(
                 }) {
                     Text("Submit")
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun InputScreen(
+    homeViewModel: HomeViewModel,
+    navController: NavController,
+    onSubmit: (Finance) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val dateFormatter = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
+
+    var name by remember { mutableStateOf("") }
+    var dateString by remember { mutableStateOf("") }
+    var category by remember { mutableStateOf("") }
+    var amount by remember { mutableStateOf("") }
+
+    Scaffold(
+        topBar = {
+            FinanceAppBar(
+                title = "Add New Expense",
+                canNavigateBack = true,
+                onUpClick = { navController.popBackStack() }
+            )
+        }
+    ) { innerPadding ->
+        Column(
+            modifier = modifier
+                .padding(innerPadding)
+                .padding(16.dp)
+        ) {
+            TextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Name") },
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            TextField(
+                value = dateString,
+                onValueChange = { dateString = it },
+                label = { Text("Date (yyyy-MM-dd)") },
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            TextField(
+                value = category,
+                onValueChange = { category = it },
+                label = { Text("Category (INCOME or EXPENSE)") },
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            TextField(
+                value = amount,
+                onValueChange = { amount = it },
+                label = { Text("Amount") },
+                keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(onClick = {
+                val newFinance = Finance(
+                    name = name,
+                    date = try {
+                        Calendar.getInstance().apply {
+                            time = dateFormatter.parse(dateString)
+                        }
+                    } catch (e: Exception) {
+                        Calendar.getInstance()
+                    },
+                    category = try {
+                        enumValueOf<FinanceType>(category.uppercase(Locale.getDefault()))
+                    } catch (e: IllegalArgumentException) {
+                        FinanceType.EXPENSE
+                    },
+                    amount = amount.toDoubleOrNull() ?: 0.0
+                )
+
+                homeViewModel.addFinance(newFinance)
+                onSubmit(newFinance)
+                navController.popBackStack()
+            }) {
+                Text("Submit")
             }
         }
     }

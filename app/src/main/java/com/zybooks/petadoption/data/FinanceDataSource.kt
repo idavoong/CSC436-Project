@@ -51,6 +51,11 @@ object FinanceDataSource {
 
     // Optionally, add new finance records.
     fun addFinance(finance: Finance) {
-        financeList.add(finance)
+        val newFinance = finance.copy(id = generateUniqueId())
+        financeList.add(newFinance)
+    }
+
+    private fun generateUniqueId(): Int {
+        return financeList.maxOfOrNull { it.id }?.plus(1) ?: 1
     }
 }
