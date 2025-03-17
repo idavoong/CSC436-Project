@@ -48,6 +48,7 @@ import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -57,6 +58,7 @@ import com.zybooks.petadoption.data.FinanceDataSource
 import com.zybooks.petadoption.data.FinanceType
 import com.zybooks.petadoption.ui.theme.FinanceTheme
 import kotlinx.serialization.Serializable
+import java.text.ParseException
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -69,11 +71,15 @@ sealed class Routes {
     data class Edit(
         val financeId: Int
     )
+//
+//    @Serializable
+//    data object Input
 }
 
 @Composable
 fun FinanceApp() {
     val navController = rememberNavController()
+    val homeViewModel: HomeViewModel = viewModel() // ✅ Initialize HomeViewModel
 
     NavHost(
         navController = navController,
@@ -82,23 +88,24 @@ fun FinanceApp() {
         composable<Routes.Home> {
             HomeScreen(
                 onEditClick = { finance ->
-                    navController.navigate(
-                        Routes.Edit(finance.id)
-                    )
-                }
+                    navController.navigate(Routes.Edit(finance.id))
+                },
+                viewModel = homeViewModel // ✅ Pass HomeViewModel
             )
         }
         composable<Routes.Edit> { backstackEntry ->
             val edit: Routes.Edit = backstackEntry.toRoute()
 
             EditScreen(
-                id = edit.financeId, // Ensure `Routes.Edit` has an `id`
+                id = edit.financeId,
+                homeViewModel = homeViewModel, // ✅ Pass HomeViewModel
                 onSubmit = { updatedFinance ->
-                    // Handle finance update logic (e.g., update database or state)
+                    // Handle finance update logic
                 },
                 onDelete = { financeToDelete ->
                     // Handle finance deletion logic
-                }
+                },
+                navController = navController // ✅ Pass NavController
             )
         }
     }
@@ -134,16 +141,16 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = viewModel()
 ) {
+    val financeList by viewModel.financeList.collectAsState()
+
     Scaffold(
-        topBar = {
-            FinanceAppBar(title = "Recent Expenses")
-        }
+        topBar = { FinanceAppBar(title = "Recent Expenses") }
     ) { innerPadding ->
         LazyColumn(
             contentPadding = PaddingValues(8.dp),
             modifier = modifier.padding(innerPadding)
         ) {
-            items(viewModel.financeList) { finance ->
+            items(financeList) { finance ->
                 ExpenseItem(
                     expense = finance,
                     onEditClick = onEditClick,
@@ -209,9 +216,11 @@ fun ExpenseItem(
 @Composable
 fun EditScreen(
     id: Int,
+    homeViewModel: HomeViewModel, // ✅ Pass HomeViewModel
     viewModel: EditViewModel = viewModel(),
     onSubmit: (Finance) -> Unit,
     onDelete: (Finance) -> Unit,
+    navController: NavController, // ✅ Add NavController to navigate back
     modifier: Modifier = Modifier
 ) {
     val finance by viewModel.finance.collectAsState()
@@ -274,11 +283,14 @@ fun EditScreen(
                 Button(onClick = {
                     val updatedFinance = finance.copy(
                         name = name,
-                        date = dateFormatter.parse(date) ?: finance.date, // Convert String -> Date
-                        category = try { enumValueOf<FinanceType>(category) } catch (e: IllegalArgumentException) { finance.category }, // Convert String -> FinanceType
+                        date = try { dateFormatter.parse(date) ?: finance.date } catch (e: ParseException) { finance.date },
+                        category = try { enumValueOf<FinanceType>(category) } catch (e: IllegalArgumentException) { finance.category },
                         amount = amount.toDoubleOrNull() ?: finance.amount
                     )
+
+                    homeViewModel.updateFinance(updatedFinance)  // ✅ Update HomeViewModel
                     onSubmit(updatedFinance)
+                    navController.popBackStack() // ✅ Go back to home
                 }) {
                     Text("Submit")
                 }
@@ -297,24 +309,24 @@ fun PreviewHomeScreen() {
     }
 }
 
-@Preview
-@Composable
-fun PreviewEditScreen() {
-    val finance = FinanceDataSource().getFinance(1) ?: Finance() // Get a sample finance object
-    val dummyViewModel = EditViewModel() // Create a mock ViewModel
-
-    FinanceTheme {
-        EditScreen(
-            id = finance.id,
-            viewModel = dummyViewModel,
-            onSubmit = { updatedFinance ->
-                // Mock submit action for preview
-                println("Updated finance: $updatedFinance")
-            },
-            onDelete = { financeToDelete ->
-                // Mock delete action for preview
-                println("Deleted finance: $financeToDelete")
-            }
-        )
-    }
-}
+//@Preview
+//@Composable
+//fun PreviewEditScreen() {
+//    val finance = FinanceDataSource().getFinance(1) ?: Finance() // Get a sample finance object
+//    val dummyViewModel = EditViewModel() // Create a mock ViewModel
+//
+//    FinanceTheme {
+//        EditScreen(
+//            id = finance.id,
+//            viewModel = dummyViewModel,
+//            onSubmit = { updatedFinance ->
+//                // Mock submit action for preview
+//                println("Updated finance: $updatedFinance")
+//            },
+//            onDelete = { financeToDelete ->
+//                // Mock delete action for preview
+//                println("Deleted finance: $financeToDelete")
+//            },
+//        )
+//    }
+//}
