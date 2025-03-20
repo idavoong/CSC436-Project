@@ -15,7 +15,6 @@ class EditViewModel : ViewModel() {
         _finance.value = FinanceDataSource.getFinance(id) ?: Finance()
     }
 
-    // Save the updated finance record.
     fun saveFinance(updatedFinance: Finance) {
         FinanceDataSource.updateFinance(updatedFinance)
         _finance.value = updatedFinance

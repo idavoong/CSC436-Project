@@ -10,11 +10,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 class HomeViewModel : ViewModel() {
-    // Start with the list loaded from the singleton data source.
     private val _financeList = MutableStateFlow(FinanceDataSource.loadFinances())
     val financeList: StateFlow<List<Finance>> = _financeList
 
-    // Refresh the list whenever the data changes.
     private fun refreshList() {
         _financeList.value = FinanceDataSource.loadFinances()
     }

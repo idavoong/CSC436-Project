@@ -4,7 +4,6 @@ import java.util.Calendar
 import java.util.Date
 
 object FinanceDataSource {
-    // Use a mutable list so you can update, add, and remove items.
     private val financeList = mutableListOf(
         Finance(
             id = 1,
@@ -33,10 +32,8 @@ object FinanceDataSource {
         return financeList.find { it.id == id }
     }
 
-    // Return an immutable copy of the list.
     fun loadFinances(): List<Finance> = financeList.toList()
 
-    // Update a finance record by replacing the matching item.
     fun updateFinance(updatedFinance: Finance) {
         val index = financeList.indexOfFirst { it.id == updatedFinance.id }
         if (index != -1) {
@@ -44,12 +41,10 @@ object FinanceDataSource {
         }
     }
 
-    // Delete a finance record.
     fun deleteFinance(finance: Finance) {
         financeList.removeIf { it.id == finance.id }
     }
 
-    // Optionally, add new finance records.
     fun addFinance(finance: Finance) {
         val newFinance = finance.copy(id = generateUniqueId())
         financeList.add(newFinance)
